@@ -1,0 +1,5 @@
+{
+    "go.autocompleteUnimportedPackages": true,
+    "editor.formatOnSave": true,
+    "go.formatTool": "gofmt"
+}
