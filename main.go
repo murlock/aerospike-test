@@ -39,6 +39,25 @@ Secondary index: https://www.aerospike.com/docs/architecture/secondary-index.htm
 func main() {
 	client, err := as.NewClient("10.10.0.3", 3000)
 	if err != nil {
+		log.Fatal("NewClient ", err)
+	}
+	defer client.Close()
+
+	/* A list cannot be larger then block size written on disk (ADD REF), 1 MB per default
+	   It is useless in our case where we want to have sort a large numbers of entries (around 1M ?)
+	*/
+	// convertRedis2Aerospike_as_list(client, "test", "redis")
+
+	/* we can import all entry in one set with one bin name
+	   However we can't order them, need to RTFM more deeply,
+	   maybe with UDF to record entry in another format ?
+	*/
+	convertRedis2Aerospike_as_bins(client, "test", "redis")
+}
+
+func main2() {
+	client, err := as.NewClient("10.10.0.3", 3000)
+	if err != nil {
 		log.Fatal(err)
 	}
 	defer client.Close()
@@ -130,15 +149,11 @@ func main() {
 	}
 	recordset.Close()
 
-	fmt.Println("======= Query (secondary index, sorted ?)")
-	/* MapPolicy ? */
-	// mapPolicy := as.NewMapPolicyWithFlags(as.MapOrder.KEY_ORDERED, 0)
-	// client.Operate(null, "xx")
+	fmt.Println("======= Query (secondary index, sorted)")
 	stmt = as.NewStatement(ns, set, binPath)
-	/* how set IndexName ? */
 	stmt.IndexName = "IDX_PATH"
 	recordset, err = client.Query(nil, stmt)
-	/* We should use instead ListWriteFlagsAddUnique instead of FlagDefault */
+	/* TODO We should use instead ListWriteFlagsAddUnique instead of FlagDefault */
 	listPolicy := as.NewListPolicy(as.ListOrderOrdered, as.ListWriteFlagsDefault)
 	tempKey, err := as.NewKey(ns, "temp", "xxx")
 	client.Delete(nil, tempKey)
@@ -152,10 +167,6 @@ func main() {
 
 	if tmpRec != nil {
 		/* TODO estimate size */
-
-		if err != nil {
-			log.Fatal("Operate 2 ", err)
-		}
 		/* start at index 2 and return one item */
 		tmpRec, err = client.Operate(nil, tempKey, as.ListGetByIndexRangeCountOp("xxx", 2, 1, as.ListReturnTypeValue))
 		if err != nil {
